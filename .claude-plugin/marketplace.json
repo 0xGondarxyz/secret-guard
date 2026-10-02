@@ -1,0 +1,16 @@
+{
+  "name": "secret-guard",
+  "owner": {
+    "name": "Murat Can Yuksel",
+    "url": "https://github.com/0xGondarxyz"
+  },
+  "description": "Masks secrets in tool results and blocks pushes that would leak them.",
+  "plugins": [
+    {
+      "name": "secret-guard",
+      "source": "./",
+      "description": "Masks API keys and tokens in tool results before Claude reads them, and blocks a git push that would leak secrets or home paths to a public repo.",
+      "version": "0.1.0"
+    }
+  ]
+}

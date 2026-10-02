@@ -1,0 +1,8 @@
+{
+  "name": "secret-guard",
+  "version": "0.1.0",
+  "description": "Masks API keys and tokens in tool results before Claude reads them, and blocks a git push that would leak secrets or home paths to a public repo.",
+  "author": { "name": "Murat Can Yuksel", "url": "https://github.com/0xGondarxyz" },
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}
