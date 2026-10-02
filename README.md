@@ -50,7 +50,7 @@ When a Bash command runs `git push`, secret-guard checks before it runs:
 1. It finds the repo (`git -C <dir>`, a leading `cd <dir> &&`, or the session folder) and the remote (default `origin`).
 2. It asks `gh repo view` for the visibility. `PRIVATE` or `INTERNAL`: the push goes through, no scan. `PUBLIC` or unknown (no `gh`, not GitHub, an error): it scans.
 3. It scans the added lines of every local commit the remote does not have. If the same command also runs `git add` or `git commit`, it scans the working tree diff and the untracked files too (not ignored, under 1 MB, not binary).
-4. It looks for the same secrets as masking, plus absolute home paths: your real home folder and any `/home/<name>/` or `/Users/<name>/` path. `/home/user/` and `/home/runner/` are ignored.
+4. It looks for the same secrets as masking, plus absolute home paths: your real home folder and any `/home/<name>/` or `/Users/<name>/` path, and Windows paths (`C:\Users\<name>\`, the forward-slash form and the JSON-escaped form, any drive letter). `HOME` and, when set, `USERPROFILE` count as your home folder. `/home/user/`, `/home/runner/` and the Windows names `Public`, `Default`, `Default User` and `All Users` are ignored.
 
 With findings, the push is denied. The text lists up to 10 as `file:line kind`. It never prints the secret. A toast says `secret-guard: push blocked, N findings`. When the visibility was unknown, the text says so.
 

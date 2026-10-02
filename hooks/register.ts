@@ -18,7 +18,7 @@ const MARKER_DENY =
 type Scan = { findings: Finding[]; visibilityKnown: boolean }
 
 // Scans one push. Throws when the scan itself fails; the caller then lets the push through.
-async function scanPush($: EngineInterface, p: Push, home: string | undefined, t0: number): Promise<Scan> {
+async function scanPush($: EngineInterface, p: Push, home: string | undefined, homes: Array<string | undefined>, t0: number): Promise<Scan> {
   const run = async (argv: string[], cwd?: string) => {
     const left = SCAN_MS - ((await $.clock.now()) - t0)
     if (left <= 0) throw new Error('scan timed out')
@@ -66,7 +66,7 @@ async function scanPush($: EngineInterface, p: Push, home: string | undefined, t
     p.staged ? pending() : Promise.resolve([] as Added[]),
   ])
   if (log.exitCode !== 0) throw new Error('git log failed')
-  const findings = scanAdded([...addedLines(log.stdout), ...extra], home)
+  const findings = scanAdded([...addedLines(log.stdout), ...extra], homes)
   return { findings, visibilityKnown: visibility === 'PUBLIC' }
 }
 
@@ -83,11 +83,12 @@ async function verdict($: EngineInterface, e: { tool: string }, command: string 
     return undefined
   }
   const home = await $.env.get('HOME')
+  const homes = [home, await $.env.get('USERPROFILE')]
   const findings: Finding[] = []
   let known = true
   try {
     for (const p of pushes) {
-      const r = await scanPush($, p, home, now)
+      const r = await scanPush($, p, home, homes, now)
       findings.push(...r.findings)
       known = known && r.visibilityKnown
     }

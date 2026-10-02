@@ -263,7 +263,7 @@ test('scanAdded: secrets, home paths, never values', () => {
   const added = addedLines(
     diffOf('src/a.ts', ['const a = 1', `const k = "${t}"`, `const p = "${home}/work/x"`, `const o = "${HOME}other/x"`, `const ok = "${HOME}user/x"`, `const ci = "${HOME}runner/x"`]),
   )
-  const found = scanAdded(added, home)
+  const found = scanAdded(added, [home])
   expect(found).toEqual([
     { file: 'src/a.ts', line: 2, kind: 'anthropic_key' },
     { file: 'src/a.ts', line: 3, kind: 'home_path' },
@@ -274,6 +274,27 @@ test('scanAdded: secrets, home paths, never values', () => {
   expect(text.includes('src/a.ts:2 anthropic_key')).toBe(true)
   expect(text.includes('visibility unknown')).toBe(true)
   expect(text.endsWith('If these are false positives, ask the user to run /secret-guard allow, then push again.')).toBe(true)
+})
+
+test('scanAdded: Windows home paths, USERPROFILE, ignored names, prose', () => {
+  const U = 'Us' + 'ers'
+  const lines = [
+    `a = "C:\\${U}\\alice\\proj"`,
+    `b = "d:/${U.toUpperCase()}/bob/proj"`,
+    `c = "E:\\\\${U}\\\\carol\\\\proj"`,
+    `d = "F:/${U}/Public/x"`,
+    `e = "C:\\${U}\\Default\\x"`,
+    `f = "C:\\${U}\\Default User\\x"`,
+    `g = "C:\\${U}\\All Users\\x"`,
+    `h = "C:\\${U}\\Jo Smith\\x"`,
+    `i = "the /${U} folder and C:\\${U} alone, also ${U}/x"`,
+    `j = "Q:\\work\\me\\x"`,
+  ]
+  const kinds = scanAdded(addedLines(diffOf('w.ts', lines))).map((f) => f.line)
+  expect(kinds).toEqual([1, 2, 3, 8])
+  const own = 'Z:\\' + U + '\\me'
+  const withOwn = scanAdded(addedLines(diffOf('w.ts', [`p = "${own}"`, `q = "${own}x"`])), [undefined, own])
+  expect(withOwn.map((f) => f.line)).toEqual([1])
 })
 
 test('scanAdded: a multi-line private key reports its first line', () => {
@@ -331,6 +352,13 @@ test('push: public repo with a key is denied without the value', async ($, on) =
   expect(String(r.deny).includes('/secret-guard allow')).toBe(true)
   expect(f.toasts).toEqual(['secret-guard: push blocked, 1 findings'])
   expect(f.calls.some((c) => c.startsWith('gh repo view https://github.com/someone/repo'))).toBe(true)
+})
+
+test('push: USERPROFILE is checked beside HOME', async ($, on) => {
+  mock.clock(on)
+  mock.env(on, { HOME: HOME + 'tester', USERPROFILE: 'Z:\\' + 'Us' + 'ers\\me' })
+  fakeGit(on, { log: diffOf('w.ts', ['p = "Z:\\' + 'Us' + 'ers\\me\\x"']) })
+  expect(String((await push($)).deny).includes('w.ts:1 home_path')).toBe(true)
 })
 
 test('push: clean public repo and a repo with no findings go through', async ($, on) => {

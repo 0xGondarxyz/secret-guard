@@ -146,16 +146,21 @@ export function addedLines(diff: string): Added[] {
 }
 
 const HOME_PATH = /(?:\/home|\/Users)\/([A-Za-z0-9._-]+)(?=\/)/g
-const IGNORED_HOME_USERS = new Set(['user', 'runner'])
+const IGNORED_HOME_USERS = new Set(['user', 'runner', 'public', 'default', 'shared'])
+// <drive>:\Users\<name>\, <drive>:/Users/<name>/ and the JSON-escaped <drive>:\\Users\\<name>\\.
+const WINDOWS_HOME = /[A-Za-z]:(?:\\\\|\\|\/)Users(?:\\\\|\\|\/)([^\\/"'\r\n]+)(?=\\|\/)/gi
+const IGNORED_WINDOWS_USERS = new Set(['public', 'default', 'default user', 'all users'])
 const escape = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // Secrets and home paths in the added lines. Lines of one file are joined so that a
 // multi-line private key block is seen whole. Never returns a secret value.
-export function scanAdded(added: Added[], home?: string): Finding[] {
+export function scanAdded(added: Added[], homes: Array<string | undefined> = []): Finding[] {
   const findings: Finding[] = []
   const byFile = new Map<string, Added[]>()
   for (const a of added) byFile.set(a.file, [...(byFile.get(a.file) ?? []), a])
-  const homeRe = home && home.length > 1 ? new RegExp(`${escape(home.replace(/\/+$/, ''))}(?![A-Za-z0-9._-])`) : null
+  const homeRes = homes
+    .filter((h): h is string => h !== undefined && h.length > 1)
+    .map((h) => new RegExp(`${escape(h.replace(/[\\/]+$/, ''))}(?![A-Za-z0-9._-])`))
   for (const [file, lines] of byFile) {
     const starts: number[] = []
     let text = ''
@@ -171,8 +176,9 @@ export function scanAdded(added: Added[], home?: string): Finding[] {
     for (const s of findSecrets(text)) findings.push({ file, line: lineAt(s.start), kind: s.kind })
     for (const l of lines) {
       const homeHit =
-        (homeRe?.test(l.text) ?? false) ||
-        [...l.text.matchAll(HOME_PATH)].some((m) => !IGNORED_HOME_USERS.has(m[1] as string))
+        homeRes.some((re) => re.test(l.text)) ||
+        [...l.text.matchAll(HOME_PATH)].some((m) => !IGNORED_HOME_USERS.has((m[1] as string).toLowerCase())) ||
+        [...l.text.matchAll(WINDOWS_HOME)].some((m) => !IGNORED_WINDOWS_USERS.has((m[1] as string).toLowerCase()))
       if (homeHit) findings.push({ file, line: l.line, kind: 'home_path' })
     }
   }
